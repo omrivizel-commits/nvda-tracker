@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NVDA">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="manifest" href="/manifest.json">
+<title>NVDA Position</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--sub:#6e6e73;--fill:#f2f2f7;--green:#248a3d;--red:#d70015;--blue:#0071e3}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--sub:#98989d;--fill:#2c2c2e;--green:#30d158;--red:#ff453a;--blue:#0a84ff}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;
+  padding:calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 32px)}
+.wrap{max-width:560px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px}
+h1{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:0}
+.sub{color:var(--sub);font-size:14px;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:6px 11px;border-radius:99px;background:var(--card)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sub)}.dot.open{background:var(--green)}
+.card{background:var(--card);border-radius:22px;padding:20px;margin-bottom:14px}
+.label{font-size:13px;color:var(--sub);font-weight:500}
+.hero{font-size:54px;font-weight:700;letter-spacing:-.03em;line-height:1.05;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.delta{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.pos{color:var(--green)}.neg{color:var(--red)}.flat{color:var(--sub)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.grid .card{margin:0}
+.stat .v{font-size:23px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat .n{font-size:12px;color:var(--sub);margin-top:2px}
+.bar{height:8px;border-radius:99px;background:var(--fill);position:relative;margin-top:14px}
+.bar i{position:absolute;top:-3px;width:3px;height:14px;border-radius:2px;background:var(--text);left:50%}
+.bar b{position:absolute;top:0;height:8px;border-radius:99px}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:8px}
+svg{width:100%;height:150px;display:block;margin-top:8px}
+.empty{color:var(--sub);font-size:14px;text-align:center;padding:30px 0}
+.row{display:flex;gap:10px;margin-top:12px}
+input{flex:1;min-width:0;font:inherit;font-size:20px;font-weight:600;padding:11px 14px;border:0;border-radius:14px;background:var(--fill);color:var(--text);outline:none}
+button{font:inherit;font-weight:600;border:0;border-radius:14px;padding:12px 16px;background:var(--blue);color:#fff}
+.foot{color:var(--sub);font-size:12px;text-align:center;margin-top:16px;line-height:1.5}
+details summary{color:var(--sub);font-size:13px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>NVDA</h1><div class="sub">NVIDIA · 2 shares</div></div>
+    <div class="pill"><span class="dot" id="dot"></span><span id="mkt">…</span></div>
+  </header>
+
+  <div class="card">
+    <div class="label">Profit / Loss (incl. fees)</div>
+    <div class="hero" id="pl">—</div>
+    <div class="delta flat" id="plp">Loading price…</div>
+  </div>
+
+  <div class="grid">
+    <div class="card stat"><div class="label">NVDA price</div><div class="v" id="px">—</div><div class="n" id="day">today —</div></div>
+    <div class="card stat"><div class="label">Market value</div><div class="v" id="mv">—</div><div class="n">2 × price</div></div>
+    <div class="card stat"><div class="label">Total cost</div><div class="v">$350.93</div><div class="n">Bought 20:31 IL · 13 Nov 2026</div></div>
+    <div class="card stat"><div class="label">Break-even / share</div><div class="v">$175.47</div><div class="n" id="be">—</div></div>
+    <div class="card stat"><div class="label">Bought at</div><div class="v">$160.93</div><div class="n">per share, before fees</div></div>
+    <div class="card stat"><div class="label">Fees (currency)</div><div class="v neg">$29.07</div><div class="n">9.0% of $321.86</div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Distance to break-even</div>
+    <div class="bar" id="bar"><i></i></div>
+    <div class="scale"><span>−10%</span><span>Break-even</span><span>+10%</span></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Price since you bought</div>
+    <div id="chart"><div class="empty">Loading history…</div></div>
+  </div>
+
+  <div class="card">
+    <details><summary>Enter a price manually</summary>
+      <div class="row"><input id="manual" type="number" inputmode="decimal" step="0.01" placeholder="0.00"><button id="set">Set</button></div>
+    </details>
+    <div class="sub" id="upd" style="margin-top:10px">—</div>
+  </div>
+
+  <div class="foot">Prices from Yahoo Finance via the app's server. Refreshes each time you open the app. Not financial advice.</div>
+</div>
+
+<script>
+const SHARES=2, COST=350.93, BUY=160.93, BE=COST/SHARES, KEY='nvda_log_v2';
+const $=id=>document.getElementById(id);
+let log=[]; try{log=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){}
+if(!log.length) log=[{t:Date.UTC(2026,10,13,18,31),p:BUY}];
+const fmt=n=>'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const sg=n=>(n>0.004?'+':n<-0.004?'−':'')+fmt(n);
+const cls=n=>n>0.004?'pos':n<-0.004?'neg':'flat';
+let dayInfo=null, source='';
+
+function marketOpen(){
+  const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(new Date());
+  const g=t=>p.find(x=>x.type===t).value, m=(+g('hour')%24)*60+ +g('minute');
+  return {open:!['Sat','Sun'].includes(g('weekday'))&&m>=570&&m<960, left:960-m};
+}
+function showMarket(){
+  const s=marketOpen(); $('dot').className='dot'+(s.open?' open':'');
+  $('mkt').textContent=s.open?`Open · closes in ${Math.floor(s.left/60)}h ${s.left%60}m`:'Market closed';
+}
+
+function record(p,t){
+  const last=log[log.length-1];
+  if(!last||Math.abs(last.p-p)>=0.005||t-last.t>3600e3){log.push({t,p:+p.toFixed(2)}); if(log.length>2000)log=log.slice(-2000)}
+  try{localStorage.setItem(KEY,JSON.stringify(log))}catch(e){}
+}
+
+function render(){
+  const pr=log[log.length-1].p, mv=pr*SHARES, pl=mv-COST, pct=pl/COST*100;
+  $('pl').textContent=sg(pl); $('pl').className='hero '+cls(pl);
+  $('plp').textContent=(pct>0?'+':pct<0?'−':'')+Math.abs(pct).toFixed(2)+'% on $350.93'; $('plp').className='delta '+cls(pl);
+  $('px').textContent=fmt(pr); $('mv').textContent=fmt(mv);
+  $('be').textContent=pr>=BE?`${fmt(pr-BE)} above it`:`needs ${fmt(BE-pr)} more`;
+  if(dayInfo){$('day').textContent='today '+(dayInfo.changePct>=0?'+':'−')+Math.abs(dayInfo.changePct).toFixed(2)+'%';$('day').className='n '+cls(dayInfo.change)}
+  const c=Math.max(-10,Math.min(10,(pr-BE)/BE*100)), w=Math.abs(c)/10*50;
+  $('bar').querySelectorAll('b').forEach(x=>x.remove());
+  const b=document.createElement('b'); b.style.background=c>=0?'var(--green)':'var(--red)'; b.style.width=w+'%'; b.style.left=c>=0?'50%':(50-w)+'%'; $('bar').appendChild(b);
+  $('upd').textContent=source+' · '+new Date(log[log.length-1].t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' Israel time';
+  chart();
+}
+
+function chart(){
+  const W=520,H=150,pad=10, ps=log.map(x=>x.p).concat(BE);
+  if(log.length<2){ // only the buy point so far: show it against the break-even line
+    let lo=Math.min(...ps)-3,hi=Math.max(...ps)+3; const y=v=>H-pad-(v-lo)/(hi-lo)*(H-2*pad);
+    $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}">
+     <line x1="0" x2="${W}" y1="${y(BE)}" y2="${y(BE)}" stroke="var(--sub)" stroke-dasharray="4 5" stroke-width="1.2"/>
+     <text x="${W-6}" y="${y(BE)-8}" text-anchor="end" font-size="19" fill="var(--sub)">Break-even ${fmt(BE)}</text>
+     <circle cx="${pad+8}" cy="${y(log[0].p)}" r="7" fill="var(--red)"/>
+     <text x="${pad+22}" y="${y(log[0].p)+5}" font-size="19" fill="var(--text)">Bought ${fmt(log[0].p)} · 13 Nov 20:31</text>
+    </svg><div class="scale"><span>1 price so far</span><span>Enter a price to extend the line</span></div>`;
+    return;
+  }
+  let lo=Math.min(...ps),hi=Math.max(...ps); if(hi-lo<0.5){hi+=.25;lo-=.25}
+  const x=i=>pad+i*(W-2*pad)/(log.length-1), y=v=>H-pad-(v-lo)/(hi-lo)*(H-2*pad);
+  const col=log[log.length-1].p>=BE?'var(--green)':'var(--red)';
+  $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+   <line x1="0" x2="${W}" y1="${y(BE)}" y2="${y(BE)}" stroke="var(--sub)" stroke-dasharray="4 5" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+   <polyline points="${log.map((q,i)=>x(i).toFixed(1)+','+y(q.p).toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  </svg><div class="scale"><span>Dashed = break-even ${fmt(BE)}</span><span>${log.length} points</span></div>`;
+}
+
+async function fetchQuote(){
+  // 1) Full history since purchase from the server: the chart has no gaps even if the app was closed.
+  try{
+    const r=await fetch('/api/history',{cache:'no-store'}); const h=await r.json();
+    if(!r.ok||!h.price)throw 0;
+    const pts=[{t:Date.UTC(2026,10,13,18,31),p:BUY}].concat(h.points.map(x=>({t:x.t,p:+x.p.toFixed(2)})));
+    pts.push({t:h.time,p:+h.price.toFixed(2)});
+    log=pts; try{localStorage.setItem(KEY,JSON.stringify(log.slice(-2000)))}catch(e){}
+    if(h.prevClose){const ch=h.price-h.prevClose; dayInfo={change:ch,changePct:ch/h.prevClose*100}}
+    source='Live'; render(); return;
+  }catch(e){}
+  // 2) Fallback: Finnhub quote (only if FINNHUB_KEY is set on Vercel).
+  try{
+    const r=await fetch('/api/quote',{cache:'no-store'}); const q=await r.json();
+    if(!r.ok||!q.price)throw 0;
+    dayInfo=q; source='Live (Finnhub)'; record(q.price,Date.now());
+  }catch(e){ if(!source) source='Live price unavailable, showing last known';
+ }
+  render();
+}
+$('set').onclick=()=>{const v=parseFloat($('manual').value); if(v>0){source='Manual'; record(v,Date.now()); render()}};
+
+showMarket(); render(); fetchQuote();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){showMarket();fetchQuote()}});
+</script>
+</body>
+</html>
