@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="NVDA">
 <meta name="theme-color" content="#000000">
-<link rel="apple-touch-icon" href="/icon-180.png">
-<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
 <title>NVDA Position</title>
 <style>
 :root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--sub:#6e6e73;--fill:#f2f2f7;--green:#248a3d;--red:#d70015;--blue:#0071e3}
@@ -84,7 +84,7 @@ details summary{color:var(--sub);font-size:13px;cursor:pointer}
     <div class="sub" id="upd" style="margin-top:10px">—</div>
   </div>
 
-  <div class="foot">Prices from Yahoo Finance via the app's server. Refreshes each time you open the app. Not financial advice.</div>
+  <div class="foot">Prices from Yahoo Finance, updated every ~5 min on market days (may lag). Refreshes each time you open the app. Not financial advice.</div>
 </div>
 
 <script>
@@ -151,7 +151,7 @@ function chart(){
 async function fetchQuote(){
   // 1) Full history since purchase from the server: the chart has no gaps even if the app was closed.
   try{
-    const r=await fetch('/api/history',{cache:'no-store'}); const h=await r.json();
+    const r=await fetch('prices.json?t='+Date.now(),{cache:'no-store'}); const h=await r.json();
     if(!r.ok||!h.price)throw 0;
     const pts=[{t:Date.UTC(2026,10,13,18,31),p:BUY}].concat(h.points.map(x=>({t:x.t,p:+x.p.toFixed(2)})));
     pts.push({t:h.time,p:+h.price.toFixed(2)});
