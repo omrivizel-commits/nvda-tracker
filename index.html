@@ -32,7 +32,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display"
 .ranges{display:flex;gap:4px;margin:18px 20px 8px;background:#1c1c1e;border-radius:9px;padding:2px}
 .ranges button{flex:1;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;font-weight:600;padding:6px 0;border-radius:7px}
 .ranges button.on{background:#636366}
-.chartbox{position:relative;height:250px;touch-action:none}
+.chartbox{position:relative;height:260px;touch-action:none}
+.bubble{position:absolute;top:0;transform:translateX(-50%);background:#2c2c2e;border-radius:10px;padding:6px 10px;font-size:12px;line-height:1.35;text-align:center;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.bubble.on{opacity:1}.bubble b{font-size:15px;font-weight:600;display:block;font-variant-numeric:tabular-nums}
+.bubble i{font-style:normal;color:var(--sub)}
+.zbtn{position:absolute;left:20px;top:0;z-index:2;border:0;background:#1c1c1e;color:var(--text);font:inherit;font-size:12px;font-weight:600;border-radius:14px;padding:5px 10px}
+.zbtn.on{background:#0a84ff}
+.zreset{left:auto;right:20px;display:none}
+.hint{font-size:12px;color:var(--sub);text-align:center;margin-top:6px;min-height:15px}
+@keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.anim-line{stroke-dasharray:1;stroke-dashoffset:0;animation:draw .9s cubic-bezier(.4,0,.2,1)}
+.anim-fade{animation:fade .9s ease}
 svg{width:100%;height:100%;display:block;overflow:visible}
 .axis{font-size:11px;fill:var(--sub)}
 .h{font-size:13px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;margin:26px 20px 8px}
@@ -69,7 +80,8 @@ summary::-webkit-details-marker{display:none}
   <div class="ranges" id="ranges">
     <button data-r="1D">1D</button><button data-r="1W">1W</button><button data-r="1M">1M</button><button data-r="ALL" class="on">Since buy</button>
   </div>
-  <div class="chartbox" id="cb"><svg id="svg"></svg></div>
+  <div class="chartbox" id="cb"><button class="zbtn" id="zbtn">⌕ Zoom</button><button class="zbtn zreset" id="zreset">Reset</button><svg id="svg"></svg><div class="bubble" id="bub"></div></div>
+  <div class="hint" id="hint">Hold to see a price · two fingers to compare</div>
 
   <div class="h">My Position</div>
   <div class="big">
@@ -80,11 +92,11 @@ summary::-webkit-details-marker{display:none}
     <div class="row"><span>Shares</span><span>2</span></div>
     <div class="row"><span>Bought</span><span>13 Nov 2026 · 20:31</span></div>
     <div class="row"><span>Price paid</span><span>$160.93</span></div>
-    <div class="row"><span>Currency fees</span><span class="neg">$29.07 (9.0%)</span></div>
-    <div class="row"><span>Total cost</span><span>$350.93</span></div>
-    <div class="row"><span>Break-even price</span><span>$175.47</span></div>
+    <div class="row"><span>Total cost</span><span>$321.86</span></div>
+    <div class="row"><span>Break-even price</span><span>$160.93</span></div>
     <div class="row"><span>To break even</span><span id="tobe">—</span></div>
     <div class="row"><span>Today</span><span id="today">—</span></div>
+    <div class="row"><span>Currency fees (not counted)</span><span>$29.07</span></div>
   </div>
 
   <details><summary>Enter price manually</summary>
@@ -95,7 +107,7 @@ summary::-webkit-details-marker{display:none}
 </div>
 
 <script>
-const SHARES=2,COST=350.93,BUY=160.93,BE=COST/SHARES,BUYT=Date.UTC(2026,10,13,18,31),KEY='nvda_v3';
+const SHARES=2,BUY=160.93,COST=BUY*SHARES,BE=BUY,BUYT=Date.UTC(2026,10,13,18,31),KEY='nvda_v3';
 const $=id=>document.getElementById(id);
 const money=n=>'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const signed=n=>(n>=0?'+':'−')+money(n);
@@ -137,41 +149,88 @@ function view(){
   return v.length?v:pts.slice(-1);
 }
 
-let geo=null;
+let geo=null, zoom=[0,1], zoomMode=false, animate=true;
+function data(){
+  const v=view(), n=v.length; if(n<3)return v;
+  let i0=Math.floor(zoom[0]*(n-1)), i1=Math.ceil(zoom[1]*(n-1)); if(i1-i0<2){i1=Math.min(n-1,i0+2);i0=Math.max(0,i1-2)}
+  return v.slice(i0,i1+1);
+}
 function draw(){
-  const svg=$('svg'),W=svg.clientWidth||375,H=svg.clientHeight||250,top=16,bot=24,v=view();
+  const svg=$('svg'),W=svg.clientWidth||375,H=svg.clientHeight||260,top=58,bot=24,v=data();
   const vals=v.map(x=>x.p);let lo=Math.min(...vals),hi=Math.max(...vals);const padv=(hi-lo)*.12||1;lo-=padv;hi+=padv;
   const beIn=BE>=lo&&BE<=hi;
   const n=v.length,x=i=>n<2?W/2:20+i*(W-40)/(n-1),y=p=>top+(hi-p)/(hi-lo)*(H-top-bot);
-  const up=v[v.length-1].p>=v[0].p,col=up?'var(--green)':'var(--red)';
+  const up=v[n-1].p>=v[0].p,col=up?'#30d158':'#ff453a';
   const line=v.map((q,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(q.p).toFixed(1)}`).join('');
   const area=n>1?`${line}L${x(n-1)},${H-bot}L${x(0)},${H-bot}Z`:'';
   const t0=new Date(v[0].t),t1=new Date(v[n-1].t),sameDay=t0.toDateString()===t1.toDateString(),lbl=d=>d.toLocaleString('en-GB',sameDay?{hour:'2-digit',minute:'2-digit'}:{day:'numeric',month:'short'});
+  const A=animate?'anim-line':'',F=animate?'anim-fade':''; animate=false;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  svg.innerHTML=`<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up?'#30d158':'#ff453a'}" stop-opacity=".32"/><stop offset="1" stop-color="${up?'#30d158':'#ff453a'}" stop-opacity="0"/></linearGradient></defs>
+  svg.innerHTML=`<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".32"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
    ${beIn?`<line x1="0" x2="${W}" y1="${y(BE)}" y2="${y(BE)}" stroke="#636366" stroke-dasharray="2 4" stroke-width="1"/>
-   <text class="axis" x="${W-20}" y="${y(BE)-6}" text-anchor="end">Break-even ${money(BE)}</text>`
-   :`<text class="axis" x="${W-20}" y="${BE>hi?10:H-bot-4}" text-anchor="end">Break-even ${money(BE)} ${BE>hi?'↑':'↓'}</text>`}
-   ${area?`<path d="${area}" fill="url(#g)"/>`:''}
-   ${n>1?`<path d="${line}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`:''}
-   <circle cx="${x(n-1)}" cy="${y(v[n-1].p)}" r="4" fill="${col}"/>
+   <text class="axis" x="${W-20}" y="${y(BE)+14}" text-anchor="end">Your buy ${money(BE)}</text>`
+   :`<text class="axis" x="${W-20}" y="${BE>hi?top-6:H-bot-4}" text-anchor="end">Your buy ${money(BE)} ${BE>hi?'↑':'↓'}</text>`}
+   <rect id="cmp" y="${top-8}" height="${H-bot-top+8}" fill="#fff" fill-opacity=".07" style="display:none"/>
+   ${area?`<path class="${F}" d="${area}" fill="url(#g)"/>`:''}
+   ${n>1?`<path class="${A}" pathLength="1" d="${line}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`:''}
+   <circle class="${F}" cx="${x(n-1)}" cy="${y(v[n-1].p)}" r="4" fill="${col}"/>
    <text class="axis" x="20" y="${H-6}">${lbl(t0)}</text><text class="axis" x="${W-20}" y="${H-6}" text-anchor="end">${lbl(t1)}</text>
-   <g id="scrub" style="display:none"><line id="sl" y1="${top}" y2="${H-bot}" stroke="#8e8e93" stroke-width="1"/><circle id="sc" r="5" fill="#fff" stroke="${col}" stroke-width="2"/></g>`;
-  geo={v,x,y,W,n};
+   <g id="m1" style="display:none"><line y1="${top-8}" y2="${H-bot}" stroke="#8e8e93" stroke-width="1"/><circle r="5" fill="#fff" stroke="${col}" stroke-width="2"/></g>
+   <g id="m2" style="display:none"><line y1="${top-8}" y2="${H-bot}" stroke="#8e8e93" stroke-width="1"/><circle r="5" fill="#fff" stroke="${col}" stroke-width="2"/></g>`;
+  geo={v,x,y,W,H,n,top};
+  $('zreset').style.display=(zoom[0]>0||zoom[1]<1)?'block':'none';
 }
+const idxAt=cx=>{const r=$('svg').getBoundingClientRect();return Math.max(0,Math.min(geo.n-1,Math.round((cx-r.left-20)/(geo.W-40)*(geo.n-1))))};
+function mark(id,i){const g=$(id),q=geo.v[i];g.style.display='';g.children[0].setAttribute('x1',geo.x(i));g.children[0].setAttribute('x2',geo.x(i));g.children[1].setAttribute('cx',geo.x(i));g.children[1].setAttribute('cy',geo.y(q.p))}
+function bubble(xpos,html,c){const b=$('bub');b.innerHTML=html;b.classList.add('on');const w=b.offsetWidth/2;b.style.left=Math.max(w+4,Math.min(geo.W-w-4,xpos))+'px'}
+function one(cx){
+  if(!geo||geo.n<2)return; const i=idxAt(cx),q=geo.v[i],pl=(q.p-BUY)*SHARES;
+  $('m2').style.display='none';$('cmp').style.display='none'; mark('m1',i);
+  bubble(geo.x(i),`<b>${money(q.p)}</b><span class="${cl(pl)}">${signed(pl)} P&L</span><br><i>${fmtT(q.t)}</i>`);
+  header(q.p,q.t,true);
+}
+function two(ca,cb2){
+  if(!geo||geo.n<2)return; let a=idxAt(ca),b=idxAt(cb2); if(a>b)[a,b]=[b,a];
+  const qa=geo.v[a],qb=geo.v[b],d=qb.p-qa.p,dp=d/qa.p*100;
+  mark('m1',a);mark('m2',b); const r=$('cmp');r.style.display='';r.setAttribute('x',geo.x(a));r.setAttribute('width',Math.max(1,geo.x(b)-geo.x(a)));
+  r.setAttribute('fill',d>=0?'#30d158':'#ff453a'); r.setAttribute('fill-opacity','.12');
+  bubble((geo.x(a)+geo.x(b))/2,`<b class="${cl(d)}">${signed(d)} (${pctS(dp)})</b><span class="${cl(d)}">${signed(d*SHARES)} on 2 shares</span><br><i>${fmtT(qa.t)} → ${fmtT(qb.t)}</i>`);
+  $('price').textContent=money(qb.p); $('chg').textContent=`${signed(d)} (${pctS(dp)}) between points`; $('chg').className='chg '+cl(d); $('when').textContent=`${fmtT(qa.t)} → ${fmtT(qb.t)}`;
+}
+function clearMarks(){ if(!geo)return; ['m1','m2','cmp'].forEach(id=>{const e=$(id);if(e)e.style.display='none'}); $('bub').classList.remove('on'); const l=pts[pts.length-1]; header(l.p,l.t,false); }
+function setZoom(a,b){const span=Math.max(.04,Math.min(1,b-a));let s0=Math.max(0,Math.min(1-span,a));zoom=[s0,s0+span];draw()}
+function zoomAround(frac,scale){const span=(zoom[1]-zoom[0])*scale,c=zoom[0]+frac*(zoom[1]-zoom[0]);setZoom(c-frac*span,c-frac*span+span)}
 
-function scrub(e){
-  if(!geo||geo.n<2)return; const r=$('svg').getBoundingClientRect(),px=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
-  const i=Math.max(0,Math.min(geo.n-1,Math.round((px-20)/(geo.W-40)*(geo.n-1)))),q=geo.v[i];
-  $('scrub').style.display='';$('sl').setAttribute('x1',geo.x(i));$('sl').setAttribute('x2',geo.x(i));
-  $('sc').setAttribute('cx',geo.x(i));$('sc').setAttribute('cy',geo.y(q.p)); header(q.p,q.t,true);
-}
-function endScrub(){ if($('scrub'))$('scrub').style.display='none'; const l=pts[pts.length-1]; header(l.p,l.t,false); }
-const cb=$('cb'); cb.addEventListener('pointerdown',e=>{cb.setPointerCapture(e.pointerId);scrub(e)}); cb.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType==='touch')scrub(e)});
-cb.addEventListener('pointerup',endScrub); cb.addEventListener('pointerleave',endScrub); cb.addEventListener('pointercancel',endScrub);
+const cb=$('cb'), P=new Map(); let gest=null, holdT=null;
+const fracAt=cx=>{const r=$('svg').getBoundingClientRect();return Math.max(0,Math.min(1,(cx-r.left-20)/(geo.W-40)))};
+cb.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.zbtn'))return; try{cb.setPointerCapture(e.pointerId)}catch(_){} P.set(e.pointerId,e.clientX);
+  const xs=[...P.values()];
+  if(zoomMode){ gest=xs.length>=2?{type:'pinch',d0:Math.abs(xs[0]-xs[1])||1,z0:[...zoom],mid:fracAt((xs[0]+xs[1])/2)}:{type:'pan',x0:xs[0],z0:[...zoom]}; return; }
+  if(xs.length>=2){clearTimeout(holdT);gest={type:'cmp'};two(xs[0],xs[1]);return}
+  if(e.pointerType==='mouse'){gest={type:'one'};one(e.clientX);return}
+  gest={type:'wait'}; holdT=setTimeout(()=>{if(gest&&gest.type==='wait'){gest={type:'one'};one([...P.values()][0]);navigator.vibrate&&navigator.vibrate(8)}},220);
+});
+cb.addEventListener('pointermove',e=>{
+  if(!P.has(e.pointerId)){ if(e.pointerType==='mouse'&&!zoomMode&&geo)one(e.clientX); return; }
+  P.set(e.pointerId,e.clientX); const xs=[...P.values()]; if(!gest)return;
+  if(gest.type==='wait'){gest={type:'one'};clearTimeout(holdT)}
+  if(gest.type==='one')one(xs[0]); else if(gest.type==='cmp'&&xs.length>=2)two(xs[0],xs[1]);
+  else if(gest.type==='pan'){const span=gest.z0[1]-gest.z0[0],dx=(xs[0]-gest.x0)/(geo.W-40)*span;setZoom(gest.z0[0]-dx,gest.z0[1]-dx)}
+  else if(gest.type==='pinch'&&xs.length>=2){const sc=gest.d0/(Math.abs(xs[0]-xs[1])||1),span=(gest.z0[1]-gest.z0[0])*sc,c=gest.z0[0]+gest.mid*(gest.z0[1]-gest.z0[0]);setZoom(c-gest.mid*span,c-gest.mid*span+span)}
+});
+const up=e=>{P.delete(e.pointerId);clearTimeout(holdT);
+  if(gest&&gest.type==='wait'&&e.type==='pointerup'){gest={type:'one'};one(e.clientX);setTimeout(()=>{if(!P.size)clearMarks()},1400)}
+  else if(!P.size){gest=null;if(!zoomMode)clearMarks()} else if(gest&&gest.type==='cmp'){gest={type:'one'};one([...P.values()][0])}};
+cb.addEventListener('pointerup',up);cb.addEventListener('pointercancel',up);
+cb.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'&&!P.size)clearMarks()});
+cb.addEventListener('wheel',e=>{e.preventDefault();zoomAround(fracAt(e.clientX),e.deltaY>0?1.15:.87)},{passive:false});
+$('zbtn').onclick=()=>{zoomMode=!zoomMode;$('zbtn').classList.toggle('on',zoomMode);clearMarks();
+  $('hint').textContent=zoomMode?'Pinch to zoom · drag to move':'Hold to see a price · two fingers to compare'};
+$('zreset').onclick=()=>{zoom=[0,1];animate=true;draw()};
 
 $('ranges').onclick=e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;
-  document.querySelectorAll('#ranges button').forEach(x=>x.classList.toggle('on',x===b));draw()};
+  document.querySelectorAll('#ranges button').forEach(x=>x.classList.toggle('on',x===b));zoom=[0,1];animate=true;draw()};
 
 function render(){const l=pts[pts.length-1];header(l.p,l.t,false);position();draw()}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({pts:pts.slice(-3000),prevClose}))}catch(e){}}
@@ -182,7 +241,7 @@ async function load(){
     if(!r.ok||!h.price)throw 0;
     pts=[{t:BUYT,p:BUY}].concat(h.points.filter(x=>x.t>BUYT).map(x=>({t:x.t,p:+x.p.toFixed(2)})));
     if(h.time>pts[pts.length-1].t)pts.push({t:h.time,p:+h.price.toFixed(2)});
-    prevClose=h.prevClose; source='Updated'; save();
+    prevClose=h.prevClose; source='Updated'; save(); animate=true;
   }catch(e){ source='Offline · last known'; }
   render();
 }
