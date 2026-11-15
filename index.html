@@ -64,6 +64,15 @@ svg{width:100%;height:100%;display:block;overflow:visible}
 .new{background:#0a84ff;color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px}
 .more{display:block;width:100%;margin-top:4px;border:0;background:none;color:#0a84ff;font:inherit;font-size:15px;padding:12px 0}
 .nsub{font-size:12px;color:var(--sub);margin:-4px 20px 8px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s;z-index:10}
+.sheet-bg.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;background:#1c1c1e;border-radius:16px 16px 0 0;padding:8px 20px calc(env(safe-area-inset-bottom) + 16px);transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);z-index:11;max-height:75vh;overflow:auto}
+.sheet.on{transform:none}
+.grab{width:36px;height:5px;border-radius:3px;background:#48484a;margin:0 auto 12px}
+.shead{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.shead b{font-size:20px;font-weight:700}
+.shead button{border:0;background:none;color:#0a84ff;font:inherit;font-size:17px;font-weight:600}
+.sheet .ni{border-bottom:.5px solid #38383a}
 details{margin:18px 20px 0}
 summary{color:#0a84ff;font-size:15px;list-style:none;cursor:pointer}
 summary::-webkit-details-marker{display:none}
@@ -117,6 +126,9 @@ summary::-webkit-details-marker{display:none}
 
   <div class="foot" id="foot">Prices from Yahoo Finance, updated about every 5 min on market days. Not financial advice.</div>
 </div>
+
+<div class="sheet-bg" id="sbg"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div class="shead"><b id="stitle">New stories</b><button id="sdone">Done</button></div><div id="slist"></div></div>
 
 <script>
 const SHARES=2,BUY=160.93,COST=BUY*SHARES,BE=BUY,BUYT=Date.UTC(2026,10,13,18,31),KEY='nvda_v3';
@@ -273,8 +285,25 @@ async function loadNews(){
     const fresh=seenBefore?newsItems.filter(n=>n.t>seenBefore).length:0;
     $('nsub').textContent=`Checked every hour · updated ${ago(j.updated)}`+(fresh?` · ${fresh} new`:'');}
   catch(e){ $('nsub').textContent='News not available yet'; }
-  renderNews();
+  renderNews(); popNews();
 }
+
+let popped=0;
+const item=n=>`<a class="ni" href="${esc(n.link)}" target="_blank" rel="noopener"><div class="m"><span>${esc(n.source)}</span><span>·</span><span>${ago(n.t)}</span></div><div class="t">${esc(n.title)}</div></a>`;
+function markSeen(){ if(!newsItems.length)return; seenBefore=newsItems[0].t; try{localStorage.setItem(NKEY,String(seenBefore))}catch(e){} }
+function popNews(){
+  if(!seenBefore||!newsItems.length||newsItems[0].t<=popped)return;
+  const fresh=newsItems.filter(n=>n.t>seenBefore); if(!fresh.length)return;
+  popped=newsItems[0].t;
+  $('stitle').textContent=fresh.length===1?'1 new story':`${fresh.length} new stories`;
+  $('slist').innerHTML=fresh.slice(0,8).map(item).join('')+(fresh.length>8?`<div class="ni"><div class="m">+${fresh.length-8} more in the News list</div></div>`:'');
+  $('sbg').classList.add('on'); $('sheet').classList.add('on');
+}
+function closeSheet(){ $('sbg').classList.remove('on'); $('sheet').classList.remove('on'); markSeen(); renderNews(); const f=$('nsub').textContent.split(' · ').slice(0,2).join(' · '); $('nsub').textContent=f; }
+$('sdone').onclick=closeSheet; $('sbg').onclick=closeSheet;
+(()=>{let y0=null;const sh=$('sheet');sh.addEventListener('touchstart',e=>{if(sh.scrollTop<=0)y0=e.touches[0].clientY},{passive:true});
+ sh.addEventListener('touchmove',e=>{if(y0!==null){const dy=e.touches[0].clientY-y0;if(dy>0)sh.style.transform=`translateY(${dy}px)`}},{passive:true});
+ sh.addEventListener('touchend',e=>{if(y0===null)return;const dy=e.changedTouches[0].clientY-y0;y0=null;sh.style.transform='';if(dy>90)closeSheet()});})();
 $('more').onclick=()=>{newsShown+=8;renderNews()};
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&newsItems.length){try{localStorage.setItem(NKEY,String(newsItems[0].t))}catch(e){} seenBefore=newsItems[0].t } else if(!document.hidden) loadNews(); });
 if(!seenBefore) setTimeout(()=>{if(newsItems.length)try{localStorage.setItem(NKEY,String(newsItems[0].t))}catch(e){}},3000);
