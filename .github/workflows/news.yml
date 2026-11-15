@@ -1,0 +1,50 @@
+name: Update NVDA news
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: repo-writes
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch headlines
+        run: |
+          node -e '
+          const fs = require("fs");
+          const feeds = [
+            ["https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVDA&region=US&lang=en-US", "Yahoo Finance"],
+            ["https://news.google.com/rss/search?q=NVIDIA%20OR%20NVDA%20stock%20when:2d&hl=en-US&gl=US&ceid=US:en", null]
+          ];
+          const tag = (s, t) => { const m = s.match(new RegExp("<" + t + "[^>]*>([\\s\\S]*?)</" + t + ">")); return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, "").trim() : ""; };
+          const dec = s => s.replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&#39;|&apos;/g, "\x27").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+          (async () => {
+            let items = [];
+            for (const [url, src] of feeds) {
+              try {
+                const xml = await (await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })).text();
+                for (const it of xml.split("<item>").slice(1)) {
+                  let title = dec(tag(it, "title")), source = src || dec(tag(it, "source")) || "News";
+                  if (!src && title.endsWith(" - " + source)) title = title.slice(0, -(source.length + 3));
+                  const t = Date.parse(tag(it, "pubDate")) || 0, link = dec(tag(it, "link"));
+                  if (title && link && t) items.push({ title, source, link, t });
+                }
+              } catch (e) { console.log("feed failed", url); }
+            }
+            const seen = new Set(), key = s => s.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 60);
+            items = items.sort((a, b) => b.t - a.t).filter(x => !seen.has(key(x.title)) && seen.add(key(x.title))).slice(0, 40);
+            let old = { items: [] }; try { old = JSON.parse(fs.readFileSync("news.json")); } catch (e) {}
+            const same = JSON.stringify(old.items.map(x => x.link)) === JSON.stringify(items.map(x => x.link));
+            if (items.length && !same) fs.writeFileSync("news.json", JSON.stringify({ updated: Date.now(), items }));
+            console.log(items.length + " items, " + (same ? "no change" : "updated"));
+          })();
+          '
+      - name: Save if new
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update news
+          file_pattern: news.json
