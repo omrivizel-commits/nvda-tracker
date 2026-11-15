@@ -57,6 +57,13 @@ svg{width:100%;height:100%;display:block;overflow:visible}
 .big .r{text-align:right}
 .big .p{font-size:17px;font-weight:600;margin-top:2px}
 .foot{color:var(--sub);font-size:12px;text-align:center;margin:26px 24px 0;line-height:1.5}
+.news{margin:0 20px;border-top:.5px solid var(--sep)}
+.ni{display:block;padding:12px 0;border-bottom:.5px solid var(--sep);color:var(--text);text-decoration:none}
+.ni .m{font-size:12px;color:var(--sub);display:flex;gap:6px;align-items:center}
+.ni .t{font-size:15px;font-weight:600;line-height:1.3;margin-top:3px}
+.new{background:#0a84ff;color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px}
+.more{display:block;width:100%;margin-top:4px;border:0;background:none;color:#0a84ff;font:inherit;font-size:15px;padding:12px 0}
+.nsub{font-size:12px;color:var(--sub);margin:-4px 20px 8px}
 details{margin:18px 20px 0}
 summary{color:#0a84ff;font-size:15px;list-style:none;cursor:pointer}
 summary::-webkit-details-marker{display:none}
@@ -98,6 +105,11 @@ summary::-webkit-details-marker{display:none}
     <div class="row"><span>Today</span><span id="today">—</span></div>
     <div class="row"><span>Currency fees (not counted)</span><span>$29.07</span></div>
   </div>
+
+  <div class="h">News</div>
+  <div class="nsub" id="nsub">Checked every hour</div>
+  <div class="news" id="news"><div class="ni"><div class="m">Loading news…</div></div></div>
+  <button class="more" id="more" style="display:none">Show more</button>
 
   <details><summary>Enter price manually</summary>
     <div class="man"><input id="manual" type="number" inputmode="decimal" step="0.01" placeholder="Price"><button id="set">Set</button></div>
@@ -246,6 +258,27 @@ async function load(){
 }
 $('set').onclick=()=>{const v=parseFloat($('manual').value);if(v>0){pts.push({t:Date.now(),p:v});source='Manual';save();render()}};
 
+
+const NKEY='nvda_news_seen'; let newsItems=[], newsShown=8, seenBefore=0;
+try{seenBefore=+localStorage.getItem(NKEY)||0}catch(e){}
+const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<60?m+'m ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'};
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderNews(){
+  const box=$('news'); if(!newsItems.length){box.innerHTML='<div class="ni"><div class="m">No news yet. Check back soon.</div></div>';return}
+  box.innerHTML=newsItems.slice(0,newsShown).map(n=>`<a class="ni" href="${esc(n.link)}" target="_blank" rel="noopener"><div class="m">${seenBefore&&n.t>seenBefore?'<span class="new">NEW</span>':''}<span>${esc(n.source)}</span><span>·</span><span>${ago(n.t)}</span></div><div class="t">${esc(n.title)}</div></a>`).join('');
+  $('more').style.display=newsItems.length>newsShown?'block':'none';
+}
+async function loadNews(){
+  try{const r=await fetch('news.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();newsItems=j.items||[];
+    const fresh=seenBefore?newsItems.filter(n=>n.t>seenBefore).length:0;
+    $('nsub').textContent=`Checked every hour · updated ${ago(j.updated)}`+(fresh?` · ${fresh} new`:'');}
+  catch(e){ $('nsub').textContent='News not available yet'; }
+  renderNews();
+}
+$('more').onclick=()=>{newsShown+=8;renderNews()};
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&newsItems.length){try{localStorage.setItem(NKEY,String(newsItems[0].t))}catch(e){} seenBefore=newsItems[0].t } else if(!document.hidden) loadNews(); });
+if(!seenBefore) setTimeout(()=>{if(newsItems.length)try{localStorage.setItem(NKEY,String(newsItems[0].t))}catch(e){}},3000);
+loadNews();
 market(); render(); load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){market();load()}});
 addEventListener('resize',draw);
